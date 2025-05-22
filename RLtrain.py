@@ -5,23 +5,23 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
 
+NUM_EQUALS = 50
+
 
 def train_agent():
     """
     Main function to initialize, train, and save the PPO agent for ACC.
-    Allows for continuing training from a previously saved model.
     """
     # --- Configuration ---
     LOG_DIR = "logs/"
     MODEL_DIR = "models/"
 
     # Training hyperparameters
-    TOTAL_TIMESTEPS = 1000000  # Total number of training steps
-    SAVE_FREQ = 50000  # Save a checkpoint every n steps
-    MODEL_NAME_PREFIX = "ppo_acc"  # Prefix for saved models and logs
+    TOTAL_TIMESTEPS = 1000000
+    SAVE_FREQ = 50000
+    MODEL_NAME_PREFIX = "ppo_acc"
 
-    # Path for continuing training. If this file exists, training will resume from it.
-    # To continue training, copy your desired model to this path or update the path.
+    # Path for continuing training from existing model.
     LOAD_MODEL_PATH = os.path.join(MODEL_DIR, "ppo_acc_to_continue.zip")
 
     # PPO agent hyperparameters
@@ -37,21 +37,18 @@ def train_agent():
         "vf_coef": 0.5,
         "max_grad_norm": 0.5,
         "device": "auto",
-        # "policy_kwargs": dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])]) # Example
+        # "policy_kwargs": dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])])
     }
 
-    # Create log and model save directories if they don't exist
+    # Create log and model save directories if not exist
     os.makedirs(LOG_DIR, exist_ok=True)
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    # 1. Initialize ACC Environment
+    # Initialize ACC Environment
     print("Initializing ACC Environment...")
     try:
         env = ACCEnv()
-        # Check if the environment follows the Gym API (optional but recommended)
-        # check_env(env)  # May cause errors due to ACC's specificity, can be commented out if problematic
-        # Commented out check_env to reduce initial resets.
-        print("ACC Environment initialized successfully. (check_env skipped)")
+        print("ACC Environment initialized successfully.")
     except Exception as e:
         print(f"Failed to initialize ACC Environment: {e}")
         print(
@@ -59,30 +56,25 @@ def train_agent():
         )
         return
 
-    # 2. Initialize PPO Agent or load existing one
+    # Initialize PPO Agent or load existing one
     print("Initializing PPO Agent...")
     try:
         if os.path.exists(LOAD_MODEL_PATH):
-            print(f"Loading existing model from: {LOAD_MODEL_PATH}")
-            # When loading a model to continue training, ensure 'env' and 'tensorboard_log' are passed.
-            # You can also adjust hyperparameters after loading, e.g., model.learning_rate.
+            print(f"Loading existing model from '{LOAD_MODEL_PATH}'...")
             model = PPO.load(
                 LOAD_MODEL_PATH,
                 env=env,
                 tensorboard_log=LOG_DIR,
-                # Custom PPO.load arguments can be added here if needed, e.g., device="cuda"
             )
-            # Example: Adjust learning rate for fine-tuning
-            # model.learning_rate = 0.00005
-            print("Model loaded successfully. Continuing training.")
+            print("Model loaded successfully.")
         else:
-            print(f"Model not found at '{LOAD_MODEL_PATH}'. Creating a new model.")
+            print(f"Model not found at '{LOAD_MODEL_PATH}'. Creating a new model...")
             model = PPO(
                 policy="MlpPolicy",
                 env=env,
-                verbose=0,  # Changed from 1 to 0 to reduce console output
+                verbose=0,
                 tensorboard_log=LOG_DIR,
-                **PPO_PARAMS,  # Unpack PPO hyperparameters
+                **PPO_PARAMS,
             )
             print("New PPO Agent initialized successfully.")
     except Exception as e:
@@ -90,7 +82,7 @@ def train_agent():
         env.close()
         return
 
-    # 3. Set up callback to save model periodically
+    # Set up callback to save model periodically
     current_timestamp = time.strftime("%Y%m%d-%H%M%S")
     checkpoint_save_path = os.path.join(
         MODEL_DIR, f"{MODEL_NAME_PREFIX}_{current_timestamp}"
@@ -101,14 +93,14 @@ def train_agent():
         name_prefix=MODEL_NAME_PREFIX,
     )
 
-    # 4. Start training
+    # Start training
     print(f"Starting training, total timesteps: {TOTAL_TIMESTEPS}...")
     try:
         model.learn(
             total_timesteps=TOTAL_TIMESTEPS,
             callback=checkpoint_callback,
             log_interval=1,  # Log training progress every episode
-            tb_log_name=f"{MODEL_NAME_PREFIX}_{current_timestamp}",  # For TensorBoard
+            tb_log_name=f"{MODEL_NAME_PREFIX}_{current_timestamp}",
         )
         print("Training completed.")
     except KeyboardInterrupt:
@@ -116,29 +108,28 @@ def train_agent():
     except Exception as e:
         print(f"An error occurred during training: {e}")
     finally:
-        # 5. Save final model
+        # Save final model
         final_model_name = f"{MODEL_NAME_PREFIX}_final_{current_timestamp}.zip"
         final_model_path = os.path.join(MODEL_DIR, final_model_name)
         model.save(final_model_path)
         print(f"Final model saved to: {final_model_path}")
 
-        # 6. Close environment
+        # Close environment
         print("Closing ACC Environment...")
         env.close()
         print("ACC Environment closed.")
 
 
 if __name__ == "__main__":
-    print("=" * 30)
-    print("ACC Reinforcement Learning Training Script")
-    print("=" * 30)
+    print("=" * NUM_EQUALS)
+    print("Assetto Corsa Competizione (ACC) Reinforcement Learning Training Script")
+    print("=" * NUM_EQUALS)
     print("Important Notes:")
-    print("1. Ensure Assetto Corsa Competizione (ACC) game is running.")
+    print("1. Ensure ACC game is running.")
     print("2. Ensure Shared Memory is enabled in ACC.")
     print("3. Ensure vJoy driver is installed and configured.")
-    print("4. Training can take a long time, please be patient.")
-    print("5. Press Ctrl+C to terminate training early and save the current model.")
-    print("-" * 30)
+    print("4. Press Ctrl+C to terminate training and save the current model.")
+    print("-" * NUM_EQUALS)
 
     # Wait a few seconds to allow user to switch to game window or prepare
     wait_time = 5
@@ -152,6 +143,6 @@ if __name__ == "__main__":
 
     train_agent()
 
-    print("=" * 30)
+    print("=" * NUM_EQUALS)
     print("Training script execution finished.")
-    print("=" * 30)
+    print("=" * NUM_EQUALS)

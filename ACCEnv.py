@@ -30,25 +30,34 @@ class ACCEnv(gym.Env):
 
     # --- Reset Behavior ---
     INITIAL_THROTTLE_VALUE = 70
-    INITIAL_THROTTLE_DURATION = 1
+    INITIAL_THROTTLE_DURATION = 2.5
     RESET_MENU_DELAY = 5
 
     # --- Action Smoothing ---
-    DEFAULT_ACTION_SMOOTHING_FACTOR = 0.3
+    DEFAULT_ACTION_SMOOTHING_FACTOR = 0.3  # TODO: Adjust this value
 
     # --- Episode Settings ---
-    DEFAULT_MAX_EPISODE_STEPS = 100000
+    DEFAULT_MAX_EPISODE_STEPS = 50000
     REWARD_PRINT_INTERVAL = 500
-    CUMULATIVE_REWARD_PRINT_INTERVAL = 2500
+    CUMULATIVE_REWARD_PRINT_INTERVAL = 100
 
-    # --- Reward Coefficients ---
-    REWARD_SPEED_FACTOR = 1.0 / 10.0
+    # --- Reward Coefficients --- # TODO: Adjust these reward/penalty coefficients
+    REWARD_SPEED_FACTOR = 1.0 / 5.0
     REWARD_PROGRESS_MULTIPLIER = 200.0
     PENALTY_OFF_TRACK = -100.0
     REWARD_SURVIVAL = 0.01
     PENALTY_DAMAGE_MULTIPLIER = -100.0
-    PENALTY_SLIP_MULTIPLIER = -10.0
-    PENALTY_STUCK_OFF_TRACK_QUALIFYING = -500.0
+    PENALTY_SLIP_MULTIPLIER = -30.0
+    PENALTY_STUCK_OFF_TRACK_QUALIFYING = -10000.0
+    PENALTY_STEERING_RATE = -1.0
+    LOW_SPEED_PENALTY_FACTOR = 0.5
+
+    # --- Reward Logic Thresholds --- # TODO: Adjust these logic thresholds
+    DESIRED_MIN_SPEED_KMH = 15.0
+    PROGRESS_REWARD_MIN_SPEED_KMH = 10.0
+    DAMAGE_INCREASE_THRESHOLD = 0.005
+    SLIP_THRESHOLD = 0.5
+    STEERING_RATE_THRESHOLD = 0.1
 
     def _ensure_scalar_float(self, val, default_if_error=0.0):
         try:
@@ -174,6 +183,8 @@ class ACCEnv(gym.Env):
             "damage_penalty_multiplier": self.PENALTY_DAMAGE_MULTIPLIER,
             "slip_penalty_multiplier": self.PENALTY_SLIP_MULTIPLIER,
             "stuck_off_track_qualifying_penalty": self.PENALTY_STUCK_OFF_TRACK_QUALIFYING,
+            "steering_rate_penalty": self.PENALTY_STEERING_RATE,
+            "low_speed_penalty_factor": self.LOW_SPEED_PENALTY_FACTOR,  # Add new factor to dict
         }
         if reward_config:
             self.reward_coeffs.update(reward_config)
@@ -251,8 +262,8 @@ class ACCEnv(gym.Env):
         self.suspension_damage = np.array([0.0, 0.0, 0.0, 0.0])
         self.aero_damage = 0.0
         self.engine_damage = 0.0
-        self.tyre_slip = np.array([0.0, 0.0, 0.0, 0.0])
-        self.tyre_core_temperature = np.array([0.0, 0.0, 0.0, 0.0])
+        self.tyre_slip = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        self.tyre_core_temperature = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
         self.previous_normalized_car_position = 0.0
         self.previous_total_damage = 0.0
@@ -481,8 +492,15 @@ class ACCEnv(gym.Env):
             np.mean(self.suspension_damage) + self.aero_damage + self.engine_damage
         ) / 3.0
 
-        # Speed reward
-        reward += self.speed_kmh * self.reward_coeffs["speed_factor"]
+        # Speed reward / Low speed penalty
+        if self.speed_kmh < self.DESIRED_MIN_SPEED_KMH:
+            # Penalty increases as speed drops further below DESIRED_MIN_SPEED_KMH
+            reward -= (
+                self.DESIRED_MIN_SPEED_KMH - self.speed_kmh
+            ) * self.reward_coeffs["low_speed_penalty_factor"]
+        else:
+            # Reward for speed when above DESIRED_MIN_SPEED_KMH
+            reward += self.speed_kmh * self.reward_coeffs["speed_factor"]
 
         # Track progress reward
         progress_made = (
@@ -496,7 +514,7 @@ class ACCEnv(gym.Env):
             progress_made -= 1.0
 
         if (
-            self.speed_kmh > 10
+            self.speed_kmh > self.PROGRESS_REWARD_MIN_SPEED_KMH
         ):  # Only reward progress at a certain speed to avoid farming points by moving slowly
             reward += progress_made * self.reward_coeffs["progress_multiplier"]
 
@@ -509,7 +527,9 @@ class ACCEnv(gym.Env):
 
         # Damage penalty
         damage_increase = current_total_damage - self.previous_total_damage
-        if damage_increase > 0.005:  # Tolerate very small floating point errors
+        if (
+            damage_increase > self.DAMAGE_INCREASE_THRESHOLD
+        ):  # Tolerate very small floating point errors
             reward += (
                 damage_increase * self.reward_coeffs["damage_penalty_multiplier"]
             )  # Multiplier is negative
@@ -521,12 +541,19 @@ class ACCEnv(gym.Env):
             and len(self.tyre_slip) > 0
             else 0.0
         )
-        # Penalize if average slip is above a threshold (e.g., 0.5)
-        slip_threshold = 0.5
-        if avg_slip > slip_threshold:
-            reward += (avg_slip - slip_threshold) * self.reward_coeffs[
+        # Penalize if average slip is above a threshold
+        if avg_slip > self.SLIP_THRESHOLD:
+            reward += (avg_slip - self.SLIP_THRESHOLD) * self.reward_coeffs[
                 "slip_penalty_multiplier"
             ]  # Multiplier is negative
+
+        steering_change = abs(
+            self.last_applied_action[0] - self.previous_applied_action[0]
+        )
+        if steering_change > self.STEERING_RATE_THRESHOLD:
+            reward += (
+                steering_change - self.STEERING_RATE_THRESHOLD
+            ) * self.reward_coeffs["steering_rate_penalty"]
 
         self.previous_normalized_car_position = self.normalized_car_position
         self.previous_total_damage = current_total_damage

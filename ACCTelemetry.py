@@ -9,7 +9,7 @@ class ACCTelemetry(LocalParametersClass):
 
     # @brief __init__: Initialize parameters and variables
     def __init__(self) -> None:
-        print("ACCData.init()")
+        print("ACC Telemetry initialized.")
 
         super().__init__()
 
@@ -27,7 +27,7 @@ class ACCTelemetry(LocalParametersClass):
 
     # @brief start: Declare memory maps for physics, graphic, and static fields
     def start(self) -> None:
-        print("ACCData.start()")
+        print("ACC Telemetry started.")
 
         if not self.mmapPhysics:
             self.mmapPhysics = mmap.mmap(
@@ -92,7 +92,7 @@ class ACCTelemetry(LocalParametersClass):
 
     # @brief stop: Stop ACC data telemetry monitoring
     def stop(self) -> None:
-        print("ACCData.stop()")
+        print("ACC Telemetry stopped.")
 
         if self.mmapPhysics:
             self.mmapPhysics.close()

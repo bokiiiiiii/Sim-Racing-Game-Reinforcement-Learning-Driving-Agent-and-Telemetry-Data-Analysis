@@ -1,28 +1,59 @@
 # ACC Telemetry Data Analysis and Reinforcement Learning Driving Agent
 
-This project aims to analyze telemetry data from Assetto Corsa Competizione (ACC) and train a Reinforcement Learning (RL) agent capable of autonomous driving within the game.
+This project aims to analyze telemetry data from Assetto Corsa Competizione (ACC) and train a Reinforcement Learning (RL) agent capable of autonomous driving within the game. By collecting and analyzing detailed driving data, we have built a simulation environment to train the RL agent to learn optimal driving strategies.
 
 ## Project Goals
 
-*   **Telemetry Data Collection and Analysis**: 
-Extract detailed telemetry data from ACC, such as speed, RPM, tire temperatures, suspension travel, etc.
-*   **Environment Construction**: 
-Build a simulation environment suitable for RL training based on ACC telemetry data.
-*   **Reinforcement Learning Agent Training**: 
-Train an RL agent using algorithms like Proximal Policy Optimization (PPO) to learn driving policies.
+*   **Telemetry Data Collection and Analysis**: Extract detailed telemetry data from ACC, such as speed, RPM, tire temperatures, suspension travel, etc., to gain in-depth understanding of vehicle dynamics.
+*   **Simulation Environment Construction**: Build a simulation environment suitable for RL training based on ACC telemetry data, accurately reflecting real-world driving conditions.
+*   **Reinforcement Learning Agent Training**: Train an RL agent using advanced algorithms like Proximal Policy Optimization (PPO) to learn and execute complex driving policies.
+*   **Real-time Decision Comparison**: Develop a user interface (`ACCDrivingOptimization.py`) to display real-time differences between player input and RL agent decisions, providing insights into the agent's behavior.
+
+## Tech Stack
+
+*   **Programming Language**: Python
+*   **Reinforcement Learning**: Stable Baselines3 (PPO Algorithm)
+*   **Game Interaction**: ACC Shared Memory SDK
+*   **User Interface**: CustomTkinter
+*   **Data Processing**: NumPy
 
 ## Project Structure
 
-*   `ACCController.py`: Script to control the ACC game.
-*   `ACCEnv.py`: Defines the Reinforcement Learning environment.
-*   `ACCTelemetry.py`: Script for processing ACC telemetry data.
-*   `LocalParameters.py`: Local parameter settings.
-*   `main.py`: Main execution file for the project.
-*   `RealTimePlot.py`: Script for real-time plotting of telemetry data.
-*   `requirements.txt`: Required Python packages for the project.
-*   `RLtrain.py`: Reinforcement Learning training script.
-*   `logs/`: Directory for storing training logs.
-*   `models/`: Directory for storing trained models.
+The project is organized as follows:
+
+```
+.
+├── ACCController.py             # Script to control the ACC game
+├── ACCDrivingOptimization.py    # GUI for real-time player vs. agent decision comparison
+├── ACCEnv.py                    # Defines the Reinforcement Learning environment for ACC
+├── ACCTelemetry.py              # Script for processing ACC telemetry data
+├── LocalParameters.py           # Local parameter settings for the project
+├── main.py                      # Main execution file for the project
+├── RealTimePlot.py              # Script for real-time plotting of telemetry data
+├── requirements.txt             # Python dependencies for the project
+├── RLtrain.py                   # Reinforcement Learning training script
+├── vJoyDisable.bat              # Batch file to disable vJoy virtual joystick
+├── .gitignore                   # Specifies intentionally untracked files that Git should ignore
+├── README.md                    # This README file
+├── RL_Training.gif              # GIF showcasing the RL agent's training process
+├── ACCDrivingOptimization_UI.png # Screenshot of the ACCDrivingOptimization UI
+```
+
+**File Descriptions:**
+
+*   **`ACCDrivingOptimization.py`**: A GUI application for real-time comparison of player's driving inputs (throttle, brake, steer) against the RL agent's decisions.
+*   **`ACCController.py`**: Script to control the ACC game, potentially including functions to launch the game, set up tracks, etc.
+*   **`ACCEnv.py`**: Defines the Reinforcement Learning environment. It handles interactions with ACC, observation of states, calculation of rewards, and execution of actions.
+*   **`ACCTelemetry.py`**: Script for processing telemetry data obtained from ACC, including data reading, parsing, and transformation.
+*   **`LocalParameters.py`**: Contains local parameter settings for the project, such as path configurations, model parameters, etc.
+*   **`main.py`**: The main execution file for the project, possibly serving as an entry point to coordinate different modules.
+*   **`RealTimePlot.py`**: Script for real-time plotting of telemetry data, facilitating monitoring and analysis.
+*   **`requirements.txt`**: Lists all required Python packages for the project and their versions.
+*   **`RLtrain.py`**: The training script for the Reinforcement Learning agent. It is responsible for setting up the training pipeline, loading the environment, running training loops, and saving models.
+*   **`test_agent.py`**: Script for testing the performance of a trained RL agent.
+*   **`vJoyDisable.bat`**: A batch file, likely used to disable vJoy virtual joystick devices.
+*   **`logs/`**: Directory for storing log files during training, such as TensorBoard event files.
+*   **`models/`**: Directory for storing trained Reinforcement Learning models.
 
 ## Training Process Showcase
 
@@ -31,13 +62,29 @@ Below is a demonstration of the Reinforcement Learning agent's performance durin
 <!-- Insert your training process GIF here -->
 ![Training Process GIF](RL_Training.gif)
 
+## ACCDrivingOptimization UI Showcase
+
+`ACCDrivingOptimization.py` provides a real-time user interface that displays the differences between player input and RL agent decisions for throttle, brake, and steer.
+
+![ACC Driving Optimization UI](ACCDrivingOptimization_UI.png)
+
 ## How to Use
 
 1.  **Install Dependencies**:
+    Open a terminal and run the following command to install all necessary Python packages:
     ```bash
     pip install -r requirements.txt
     ```
-2.  **Start Training**:
+2.  **Start Reinforcement Learning Training**:
+    To begin training the RL agent, execute:
     ```bash
     python RLtrain.py
     ```
+    Training logs will be saved in the `logs/` directory, and trained models will be stored in the `models/` directory.
+
+3.  **Run Real-time Decision Comparison UI**:
+    To launch the `ACCDrivingOptimization` UI and observe the decision differences between the player and the agent, run:
+    ```bash
+    python ACCDrivingOptimization.py
+    ```
+    Ensure that the ACC game is running so the script can connect and fetch telemetry data.

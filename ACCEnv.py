@@ -34,14 +34,14 @@ class ACCEnv(gym.Env):
     RESET_MENU_DELAY = 5
 
     # --- Action Smoothing ---
-    DEFAULT_ACTION_SMOOTHING_FACTOR = 0.3  # TODO: Adjust this value
+    DEFAULT_ACTION_SMOOTHING_FACTOR = 0.3
 
     # --- Episode Settings ---
     DEFAULT_MAX_EPISODE_STEPS = 50000
     REWARD_PRINT_INTERVAL = 500
     CUMULATIVE_REWARD_PRINT_INTERVAL = 100
 
-    # --- Reward Coefficients --- # TODO: Adjust these reward/penalty coefficients
+    # --- Reward Coefficients ---
     REWARD_SPEED_FACTOR = 1.0 / 5.0
     REWARD_PROGRESS_MULTIPLIER = 200.0
     PENALTY_OFF_TRACK = -100.0
@@ -52,7 +52,7 @@ class ACCEnv(gym.Env):
     PENALTY_STEERING_RATE = -1.0
     LOW_SPEED_PENALTY_FACTOR = 0.5
 
-    # --- Reward Logic Thresholds --- # TODO: Adjust these logic thresholds
+    # --- Reward Logic Thresholds ---
     DESIRED_MIN_SPEED_KMH = 15.0
     PROGRESS_REWARD_MIN_SPEED_KMH = 10.0
     DAMAGE_INCREASE_THRESHOLD = 0.005
@@ -121,9 +121,11 @@ class ACCEnv(gym.Env):
         )
 
         # Observation space:
-        # speed, steering angle, pedal inputs, gear, RPM, track position,
-        # off-track status, damage levels, tyre slip, tyre temperatures, and car world position.
-        self.observation_shape = (15,)
+        # speed, steering angle, gear, RPM, track position,
+        # suspension_damage_avg, tyre_slip_avg, tyre_core_temp_avg_normalized, car_world_pos_x_normalized, car_world_pos_z_normalized.
+        self.observation_shape = (
+            10,  # Reduced from 12 after removing throttle_input, brake_input
+        )
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=self.observation_shape, dtype=np.float32
         )
@@ -153,10 +155,10 @@ class ACCEnv(gym.Env):
         self.current_lap_time_ms = 0.0
         self.last_lap_time_ms = 0.0
         self.car_world_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        self.is_off_track = False
+        # self.is_off_track = False # Removed
         self.suspension_damage = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
-        self.aero_damage = 0.0
-        self.engine_damage = 0.0
+        # self.aero_damage = 0.0 # Removed
+        # self.engine_damage = 0.0 # Removed
         self.tyre_slip = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
         self.tyre_core_temperature = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
         self.session_type = 0
@@ -171,6 +173,11 @@ class ACCEnv(gym.Env):
         self.action_smoothing_factor = action_smoothing_factor
         self.previous_applied_action = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         self.last_applied_action = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+
+        self.stuck_step_counter = 0
+        self.MAX_STUCK_STEPS = (
+            300  # Threshold for being stuck (e.g., 10 seconds at ~30 steps/sec)
+        )
 
         self.done = False
 
@@ -258,15 +265,14 @@ class ACCEnv(gym.Env):
         self.normalized_car_position = 0.0
         self.current_lap_time_ms = 0
         self.car_world_position = np.array([0.0, 0.0, 0.0])
-        self.is_off_track = False
+        # self.is_off_track = False # Removed
         self.suspension_damage = np.array([0.0, 0.0, 0.0, 0.0])
-        self.aero_damage = 0.0
-        self.engine_damage = 0.0
+        # self.aero_damage = 0.0 # Removed
+        # self.engine_damage = 0.0 # Removed
         self.tyre_slip = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
         self.tyre_core_temperature = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
         self.previous_normalized_car_position = 0.0
-        self.previous_total_damage = 0.0
         self.current_episode_steps = 0
         self.previous_applied_action = np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
@@ -278,8 +284,8 @@ class ACCEnv(gym.Env):
         obs = self._get_observation()  # Read initial state
         self.previous_normalized_car_position = self.normalized_car_position
         self.previous_total_damage = (
-            np.mean(self.suspension_damage) + self.aero_damage + self.engine_damage
-        ) / 3.0
+            np.mean(self.suspension_damage) if self.suspension_damage.size > 0 else 0.0
+        )
 
         print("Environment has been reset.")
         return obs, {}
@@ -314,22 +320,17 @@ class ACCEnv(gym.Env):
         """
         Reads game state from ACC Shared Memory and processes it into a normalized observation vector.
 
-        The observation vector (self.observation_shape = (15,)) consists of the following features in order:
+        The observation vector (self.observation_shape = (10,)) consists of the following features in order:
         0. speed_kmh_normalized: Speed in km/h, normalized by MAX_SPEED_KMH.
         1. steer_angle: Steering angle, assumed to be in [-1, 1] from telemetry.
-        2. throttle_input: Actual throttle pedal input from game physics [0, 1].
-        3. brake_input: Actual brake pedal input from game physics [0, 1].
-        4. gear_normalized: Current gear, normalized. (R=-1, N=0, 1st=1, ... then (gear+1)/MAX_GEARS).
-        5. rpm_normalized: Engine RPM, normalized by self.max_rpm.
-        6. normalized_car_position: Lap completion percentage [0, 1].
-        7. is_off_track: Boolean (1.0 if off-track, 0.0 if on-track).
-        8. suspension_damage_avg: Average suspension damage across all wheels [0, 1].
-        9. aero_damage: Aerodynamic damage [0, 1].
-        10. engine_damage: Engine damage [0, 1].
-        11. tyre_slip_avg: Average tyre slip across all wheels. (Raw value, may need further scaling/clipping depending on typical range).
-        12. tyre_core_temp_avg_normalized: Average tyre core temperature, normalized by MAX_TYRE_TEMP_C.
-        13. car_world_pos_x_normalized: Car's X world coordinate, normalized by CAR_WORLD_POS_NORMALIZATION.
-        14. car_world_pos_z_normalized: Car's Z world coordinate (often forward/backward on track plane), normalized by CAR_WORLD_POS_NORMALIZATION.
+        2. gear_normalized: Current gear, normalized. (R=-1, N=0, 1st=1, ... then (gear+1)/MAX_GEARS).
+        3. rpm_normalized: Engine RPM, normalized by self.max_rpm.
+        4. normalized_car_position: Lap completion percentage [0, 1].
+        5. suspension_damage_avg: Average suspension damage across all wheels [0, 1].
+        6. tyre_slip_avg: Average tyre slip across all wheels. (Raw value, may need further scaling/clipping depending on typical range).
+        7. tyre_core_temp_avg_normalized: Average tyre core temperature, normalized by MAX_TYRE_TEMP_C.
+        8. car_world_pos_x_normalized: Car's X world coordinate, normalized by CAR_WORLD_POS_NORMALIZATION.
+        9. car_world_pos_z_normalized: Car's Z world coordinate (often forward/backward on track plane), normalized by CAR_WORLD_POS_NORMALIZATION.
 
         Returns:
             np.ndarray: The normalized observation vector.
@@ -342,75 +343,102 @@ class ACCEnv(gym.Env):
 
         self.speed_kmh = self._ensure_scalar_float(acc_data.get("speedKmh", 0.0))
         self.steer_angle = self._ensure_scalar_float(acc_data.get("steerAngle", 0.0))
-        self.throttle_input = self._ensure_scalar_float(acc_data.get("gas", 0.0))
-        self.brake_input = self._ensure_scalar_float(acc_data.get("brake", 0.0))
+        self.throttle_input = self._ensure_scalar_float(
+            acc_data.get("throttle", 0.0)
+        )  # Correct based on LocalParameters
+        self.brake_input = self._ensure_scalar_float(
+            acc_data.get("brake", 0.0)
+        )  # Correct
 
-        raw_gear = acc_data.get("gear", 1)  # ACC: 0=R, 1=N, 2=1st...
+        raw_gear = acc_data.get("gear", 1)  # ACC: 0=R, 1=N, 2=1st... # Correct
         scalar_gear = self._ensure_scalar_float(raw_gear, default_if_error=1)
         self.gear = int(scalar_gear) - 1  # Gym: -1=R, 0=N, 1=1st...
 
-        self.rpm = self._ensure_scalar_float(acc_data.get("rpms", 0.0))
+        self.rpm = self._ensure_scalar_float(
+            acc_data.get("rpm", 0.0)
+        )  # Correct based on LocalParameters
         self.normalized_car_position = self._ensure_scalar_float(
-            acc_data.get("normalizedCarPosition", 0.0)
+            acc_data.get("normalizedCarPosition", 0.0)  # Correct
         )
 
         self.current_lap_time_ms = self._ensure_scalar_float(
-            acc_data.get("currentTime", 0)
+            acc_data.get(
+                "currentTime", 0
+            )  # Correct (ACCTelemetry handles string conversion)
         )
-        self.last_lap_time_ms = self._ensure_scalar_float(acc_data.get("lastTime", 0))
+        self.last_lap_time_ms = self._ensure_scalar_float(
+            acc_data.get("lastTime", 0)
+        )  # Correct (ACCTelemetry handles string conversion)
 
-        raw_car_world_pos = acc_data.get("carWorldPosition", [0.0, 0.0, 0.0])
-        try:
-            self.car_world_position = np.array(
-                raw_car_world_pos, dtype=np.float32
-            ).flatten()
-            if self.car_world_position.size != 3:
-                self.car_world_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        except Exception as e:
+        # Get player car ID to correctly index into carCoordinates
+        player_car_id = int(self._ensure_scalar_float(acc_data.get("playerCarID", 0)))
+        all_car_coordinates = acc_data.get(
+            "carCoordinates", []
+        )  # This is a flat list: [x0,y0,z0, x1,y1,z1, ...]
+
+        if isinstance(all_car_coordinates, list) and len(all_car_coordinates) > (
+            player_car_id * 3 + 2
+        ):
+            car_x = all_car_coordinates[player_car_id * 3]
+            car_y = all_car_coordinates[
+                player_car_id * 3 + 1
+            ]  # Y is typically up/down in simulators
+            car_z = all_car_coordinates[
+                player_car_id * 3 + 2
+            ]  # Z is often forward/backward
+            self.car_world_position = np.array([car_x, car_y, car_z], dtype=np.float32)
+        else:
             self.car_world_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+            if not isinstance(all_car_coordinates, list):
+                print(
+                    f"Warning: carCoordinates is not a list: {type(all_car_coordinates)}"
+                )
+            elif len(all_car_coordinates) <= (player_car_id * 3 + 2):
+                print(
+                    f"Warning: carCoordinates list too short ({len(all_car_coordinates)}) for playerCarID {player_car_id}"
+                )
 
-        self.is_off_track = bool(
-            self._ensure_scalar_float(
-                acc_data.get("isOffTrack", 0.0), default_if_error=0.0
-            )
-        )
+        # self.is_off_track = bool( ... ) # Removed, as isOffTrack key is not reliably available
 
+        # suspensionDamage is correctly converted by ACCTelemetry to a list
         raw_susp_damage = acc_data.get("suspensionDamage", [0.0] * 4)
         try:
             self.suspension_damage = np.array(
                 raw_susp_damage, dtype=np.float32
             ).flatten()
-            if self.suspension_damage.size != 4:
+            if self.suspension_damage.size != 4:  # Ensure it's 4 elements
                 self.suspension_damage = np.array([0.0] * 4, dtype=np.float32)
         except:
             self.suspension_damage = np.array([0.0] * 4, dtype=np.float32)
 
-        self.aero_damage = self._ensure_scalar_float(acc_data.get("aeroDamage", 0.0))
-        self.engine_damage = self._ensure_scalar_float(
-            acc_data.get("engineDamage", 0.0)
-        )
+        # aeroDamage and engineDamage are not directly in LocalParameters with these names.
+        # ACCTelemetry doesn't create them from carDamagefront etc. These will likely be 0.
+        # self.aero_damage = self._ensure_scalar_float(acc_data.get("aeroDamage", 0.0)) # Removed
+        # self.engine_damage = self._ensure_scalar_float(acc_data.get("engineDamage", 0.0)) # Removed
 
-        raw_tyre_slip = acc_data.get("tyreSlip", [0.0] * 4)
+        # ACCTelemetry converts wheelSlipFL/FR/RL/RR to 'wheelSlip' list
+        raw_tyre_slip = acc_data.get("wheelSlip", [0.0] * 4)
         try:
             self.tyre_slip = np.array(raw_tyre_slip, dtype=np.float32).flatten()
-            if self.tyre_slip.size != 4:
+            if self.tyre_slip.size != 4:  # Ensure it's 4 elements
                 self.tyre_slip = np.array([0.0] * 4, dtype=np.float32)
         except:
             self.tyre_slip = np.array([0.0] * 4, dtype=np.float32)
 
-        raw_tyre_temp = acc_data.get("tyreCoreTemperature", [0.0] * 4)
+        # ACCTelemetry converts TyreCoreTempFL/FR/RL/RR to 'TyreCoreTemp' list
+        raw_tyre_temp = acc_data.get("TyreCoreTemp", [0.0] * 4)
         try:
             self.tyre_core_temperature = np.array(
                 raw_tyre_temp, dtype=np.float32
             ).flatten()
-            if self.tyre_core_temperature.size != 4:
+            if self.tyre_core_temperature.size != 4:  # Ensure it's 4 elements
                 self.tyre_core_temperature = np.array([0.0] * 4, dtype=np.float32)
         except:
             self.tyre_core_temperature = np.array([0.0] * 4, dtype=np.float32)
 
         self.session_type = int(
             self._ensure_scalar_float(
-                acc_data.get("SessionType", 0)
+                acc_data.get("session", 0)  # Changed from SessionType to session
             )  # 0: Unknown, 1: Practice, 2: Qualifying, ...
         )
 
@@ -427,26 +455,20 @@ class ACCEnv(gym.Env):
                 self.steer_angle
             ),  # Assumed to be in [-1, 1] from telemetry
             self._ensure_scalar_float(
-                self.throttle_input
-            ),  # Actual throttle from game physics
-            self._ensure_scalar_float(
-                self.brake_input
-            ),  # Actual brake from game physics
-            self._ensure_scalar_float(
                 (self.gear + 1) / self.MAX_GEARS
             ),  # Normalized gear
             self._ensure_scalar_float(
                 self.rpm / self.max_rpm if self.max_rpm > 0 else 0.0
             ),
             self._ensure_scalar_float(self.normalized_car_position),
-            self._ensure_scalar_float(1.0 if self.is_off_track else 0.0),
+            # Removed: self._ensure_scalar_float(1.0 if self.is_off_track else 0.0),
             self._ensure_scalar_float(
                 np.mean(self.suspension_damage)
                 if self.suspension_damage.size > 0
                 else 0.0
             ),
-            self._ensure_scalar_float(self.aero_damage),
-            self._ensure_scalar_float(self.engine_damage),
+            # Removed: self._ensure_scalar_float(self.aero_damage),
+            # Removed: self._ensure_scalar_float(self.engine_damage),
             self._ensure_scalar_float(
                 np.mean(self.tyre_slip) if self.tyre_slip.size > 0 else 0.0
             ),
@@ -471,7 +493,7 @@ class ACCEnv(gym.Env):
             obs = np.array(obs_list, dtype=np.float32)
         except ValueError as e:
             print(f"Critical Error: Could not convert obs_list to np.array. Error: {e}")
-            for i, item in enumerate(obs_list):  # Debug: inspect individual elements
+            for i, item in enumerate(obs_list):
                 print(f"Debug: obs_list[{i}] (type: {type(item)}): {item}")
             return np.zeros(self.observation_shape, dtype=np.float32)
 
@@ -489,8 +511,8 @@ class ACCEnv(gym.Env):
         """Calculate reward value based on current state"""
         reward = 0.0
         current_total_damage = (
-            np.mean(self.suspension_damage) + self.aero_damage + self.engine_damage
-        ) / 3.0
+            np.mean(self.suspension_damage) if self.suspension_damage.size > 0 else 0.0
+        )
 
         # Speed reward / Low speed penalty
         if self.speed_kmh < self.DESIRED_MIN_SPEED_KMH:
@@ -518,9 +540,9 @@ class ACCEnv(gym.Env):
         ):  # Only reward progress at a certain speed to avoid farming points by moving slowly
             reward += progress_made * self.reward_coeffs["progress_multiplier"]
 
-        # Off-track penalty
-        if self.is_off_track:
-            reward += self.reward_coeffs["off_track_penalty"]  # Penalty is negative
+        # Off-track penalty - Removed as self.is_off_track is removed
+        # if self.is_off_track:
+        #     reward += self.reward_coeffs["off_track_penalty"]  # Penalty is negative
 
         # Time penalty (or survival reward)
         reward += self.reward_coeffs["survival_reward"]
@@ -568,8 +590,8 @@ class ACCEnv(gym.Env):
 
         # Severe damage
         current_total_damage = (
-            np.mean(self.suspension_damage) + self.aero_damage + self.engine_damage
-        ) / 3.0
+            np.mean(self.suspension_damage) if self.suspension_damage.size > 0 else 0.0
+        )
         if current_total_damage > 0.8:  # Total average damage exceeds 80%
             print(f"Terminating: Vehicle severely damaged ({current_total_damage:.2f})")
             terminated = True
@@ -578,8 +600,21 @@ class ACCEnv(gym.Env):
         if (
             self.speed_kmh == 0.0 and self.status == 2
         ):  # status 2 is AC_LIVE (game is active)
-            print("Terminating: Car stuck or off-track.")
+            print("Terminating: Car off-track (speed is 0 and game is live).")
             terminated = True
+
+        # Stuck for a prolonged period if speed is zero
+        if not terminated:  # Only check if not already terminated by other conditions
+            if self.speed_kmh == 0.0:
+                self.stuck_step_counter += 1
+            else:
+                self.stuck_step_counter = 0  # Reset if car moves
+
+            if self.stuck_step_counter > self.MAX_STUCK_STEPS:
+                print(
+                    f"Terminating: Car stuck (speed is 0 for {self.stuck_step_counter} steps)."
+                )
+                terminated = True
 
         # Reached maximum episode steps (Truncation)
         if not terminated and self.current_episode_steps >= self.max_episode_steps:

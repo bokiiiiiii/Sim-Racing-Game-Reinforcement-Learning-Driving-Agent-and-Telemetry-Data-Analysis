@@ -24,17 +24,17 @@ The project is organized as follows:
 ```
 .
 ├── src/                          # Source code
-│   ├── acc_controller.py
-│   ├── acc_driving_optimization.py
-│   ├── acc_env.py
-│   ├── acc_telemetry.py
-│   ├── local_parameters.py
+│   ├── ACCController.py
+│   ├── ACCDrivingOptimization.py
+│   ├── ACCEnv.py
+│   ├── ACCTelemetry.py
+│   ├── LocalParameters.py
 │   ├── main.py
-│   ├── real_time_plot.py
-│   └── rl_train.py
+│   ├── RealTimePlot.py
+│   └── RLtrain.py
 ├── scripts/                      # Scripts
 │   └── vJoyDisable.bat
-├── assets/                       # Asset
+├── assets/                       # Assets (images, GIFs, etc.)
 │   ├── RL_Training.gif
 │   └── ACCDrivingOptimization_UI.png
 ├── logs/                         # Training logs
@@ -48,15 +48,15 @@ The project is organized as follows:
 
 **File Descriptions:**
 
-*   **`src/acc_driving_optimization.py`**: A GUI application for real-time comparison of player's driving inputs (throttle, brake, steer) against the RL agent's decisions.
-*   **`src/acc_controller.py`**: Script to control the ACC game, potentially including functions to launch the game, set up tracks, etc.
-*   **`src/acc_env.py`**: Defines the Reinforcement Learning environment. It handles interactions with ACC, observation of states, calculation of rewards, and execution of actions.
-*   **`src/acc_telemetry.py`**: Script for processing telemetry data obtained from ACC, including data reading, parsing, and transformation.
-*   **`src/local_parameters.py`**: Contains local parameter settings for the project, such as path configurations, model parameters, etc.
+*   **`src/ACCDrivingOptimization.py`**: A GUI application for real-time comparison of player's driving inputs (throttle, brake, steer) against the RL agent's decisions.
+*   **`src/ACCController.py`**: Script to control the ACC game, potentially including functions to launch the game, set up tracks, etc.
+*   **`src/ACCEnv.py`**: Defines the Reinforcement Learning environment. It handles interactions with ACC, observation of states, calculation of rewards, and execution of actions.
+*   **`src/ACCTelemetry.py`**: Script for processing telemetry data obtained from ACC, including data reading, parsing, and transformation.
+*   **`src/LocalParameters.py`**: Contains local parameter settings for the project, such as path configurations, model parameters, etc.
 *   **`src/main.py`**: The main execution file for the project, possibly serving as an entry point to coordinate different modules.
-*   **`src/real_time_plot.py`**: Script for real-time plotting of telemetry data, facilitating monitoring and analysis.
+*   **`src/RealTimePlot.py`**: Script for real-time plotting of telemetry data, facilitating monitoring and analysis.
 *   **`requirements.txt`**: Lists all required Python packages for the project and their versions.
-*   **`src/rl_train.py`**: The training script for the Reinforcement Learning agent. It is responsible for setting up the training pipeline, loading the environment, running training loops, and saving models.
+*   **`src/RLtrain.py`**: The training script for the Reinforcement Learning agent. It is responsible for setting up the training pipeline, loading the environment, running training loops, and saving models.
 *   **`src/test_agent.py`**: Script for testing the performance of a trained RL agent.
 *   **`scripts/vJoyDisable.bat`**: A batch file, likely used to disable vJoy virtual joystick devices.
 *   **`logs/`**: Directory for storing log files during training, such as TensorBoard event files.
@@ -74,7 +74,7 @@ Below is a demonstration of the Reinforcement Learning agent's performance durin
 
 ## ACCDrivingOptimization UI Showcase
 
-`src/acc_driving_optimization.py` provides a real-time user interface that displays the differences between player input and RL agent decisions for throttle, brake, and steer.
+`src/ACCDrivingOptimization.py` provides a real-time user interface that displays the differences between player input and RL agent decisions for throttle, brake, and steer.
 
 ![ACC Driving Optimization UI](assets/ACCDrivingOptimization_UI.png)
 
@@ -88,13 +88,13 @@ Below is a demonstration of the Reinforcement Learning agent's performance durin
 2.  **Start Reinforcement Learning Training**:
     To begin training the RL agent, execute:
     ```bash
-    python src/rl_train.py
+    python src/RLtrain.py
     ```
     Training logs will be saved in the `logs/` directory, and trained models will be stored in the `models/` directory.
 
 3.  **Run Real-time Decision Comparison UI**:
     To launch the `ACCDrivingOptimization` UI and observe the decision differences between the player and the agent, run:
     ```bash
-    python src/acc_driving_optimization.py
+    python src/ACCDrivingOptimization.py
     ```
     Ensure that the ACC game is running so the script can connect and fetch telemetry data.

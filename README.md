@@ -1,6 +1,10 @@
 # ACC Telemetry Data Analysis and Reinforcement Learning Driving Agent
 
+## Project Description
+
 This project aims to analyze telemetry data from Assetto Corsa Competizione (ACC) and train a Reinforcement Learning (RL) agent capable of autonomous driving within the game. By collecting and analyzing detailed driving data, we have built a simulation environment to train the RL agent to learn optimal driving strategies.
+
+*Project Start Date: Feburary 2024*
 
 ## Project Goals
 
@@ -49,7 +53,6 @@ The project is organized as follows:
 *   **`src/RealTimePlot.py`**: Script for real-time plotting of telemetry data, facilitating monitoring and analysis.
 *   **`requirements.txt`**: Lists all required Python packages for the project and their versions.
 *   **`src/RLtrain.py`**: The training script for the Reinforcement Learning agent. It is responsible for setting up the training pipeline, loading the environment, running training loops, and saving models.
-*   **`src/test_agent.py`**: Script for testing the performance of a trained RL agent.
 *   **`scripts/vJoyDisable.bat`**: A batch file, likely used to disable vJoy virtual joystick devices.
 *   **`logs/`**: Directory for storing log files during training, such as TensorBoard event files.
 *   **`models/`**: Directory for storing trained Reinforcement Learning models.
@@ -70,6 +73,10 @@ Below is a demonstration of the Reinforcement Learning agent's performance durin
 ![ACC Driving Optimization UI](assets/ACCDrivingOptimization_UI.png)
 
 ## How to Use
+
+Before proceeding, ensure vJoy is properly configured:
+*   Go to Device Manager to **enable vJoy**.
+*   To **disable vJoy** when not in use, you can run the `scripts/vJoyDisable.bat` script.
 
 1.  **Install Dependencies**:
     Open a terminal and run the following command to install all necessary Python packages:

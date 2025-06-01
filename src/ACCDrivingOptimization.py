@@ -4,7 +4,7 @@ import numpy as np
 from stable_baselines3 import PPO
 from ACCEnv import ACCEnv
 
-MODEL_PATH = "models/ppo_acc_final_20250524-164214.zip"
+MODEL_PATH = "models/ppo_acc_20250602-003202.zip"
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -146,8 +146,6 @@ class DecisionComparisonApp:
         throttle_diff = agent_throttle - player_throttle
         brake_diff = agent_brake - player_brake
         steer_diff = agent_steer - player_steer
-        throttle_diff = 0.32
-        brake_diff = -0.41
         steer_diff = agent_steer - player_steer
 
         self.throttle_diff_label.configure(text=f"{throttle_diff*100:+.0f}%")

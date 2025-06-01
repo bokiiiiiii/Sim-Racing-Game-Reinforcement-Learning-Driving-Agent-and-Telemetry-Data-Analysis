@@ -9,14 +9,6 @@ This project aims to analyze telemetry data from Assetto Corsa Competizione (ACC
 *   **Reinforcement Learning Agent Training**: Train an RL agent using advanced algorithms like Proximal Policy Optimization (PPO) to learn and execute complex driving policies.
 *   **Real-time Decision Comparison**: Develop a user interface (`ACCDrivingOptimization.py`) to display real-time differences between player input and RL agent decisions, providing insights into the agent's behavior.
 
-## Tech Stack
-
-*   **Programming Language**: Python
-*   **Reinforcement Learning**: Stable Baselines3 (PPO Algorithm)
-*   **Game Interaction**: ACC Shared Memory SDK
-*   **User Interface**: CustomTkinter
-*   **Data Processing**: NumPy
-
 ## Project Structure
 
 The project is organized as follows:
@@ -69,7 +61,6 @@ The project is organized as follows:
 
 Below is a demonstration of the Reinforcement Learning agent's performance during training:
 
-<!-- Insert your training process GIF here -->
 ![Training Process GIF](assets/RL_Training.gif)
 
 ## ACCDrivingOptimization UI Showcase
